@@ -16,15 +16,23 @@
 
 package zio
 
+import cats.effect.kernel.{ Async, Outcome, Resource }
 import cats.effect.std.Dispatcher
-import cats.effect.syntax.all._
-import cats.effect.{ Async, Outcome, Resource }
 import cats.syntax.all._
 
 import scala.concurrent.Future
 
 package object interop extends interop.PlatformSpecific {
   type Queue[F[+_], A] = CQueue[F, A, A]
+
+  /** A queue that can only be dequeued. */
+  type Dequeue[F[+_], +A] = CQueue[F, Nothing, A]
+
+  /** A queue that can only be enqueued. */
+  type Enqueue[F[+_], -A] = CQueue[F, A, Nothing]
+
+  type Hub[F[+_], A] = CHub[F, A, A]
+  val Hub: CHub.type = CHub
 
   @inline private[interop] def toOutcome[R, E, A](exit: Exit[E, A]): Outcome[ZIO[R, E, *], E, A] =
     exit match {
@@ -71,7 +79,11 @@ package object interop extends interop.PlatformSpecific {
   @inline private[zio] def toEffect[F[_], R, A](rio: RIO[R, A])(implicit R: Runtime[R], F: Async[F]): F[A] =
     F.uncancelable { poll =>
       F.delay(R.unsafeRunToFuture(rio)).flatMap { future =>
-        poll(F.fromFuture(F.pure[Future[A]](future)).onCancel(F.fromFuture(F.delay(future.cancel())).void))
+        poll(F.onCancel(F.fromFuture(F.pure[Future[A]](future)), F.fromFuture(F.delay(future.cancel())).void))
       }
     }
+
+  private[zio] implicit class ToEffectSyntax[R, A](private val rio: RIO[R, A]) extends AnyVal {
+    def toEffect[F[_]: Async](implicit R: Runtime[R]): F[A] = interop.toEffect(rio)
+  }
 }

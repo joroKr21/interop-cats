@@ -36,11 +36,11 @@ lazy val root = project
   .enablePlugins(ScalaJSPlugin)
   .aggregate(interopCatsJVM, interopCatsJS)
   .settings(
-    skip in publish := true,
+    publish / skip := true,
     unusedCompileDependenciesFilter -= moduleFilter("org.scala-js", "scalajs-library")
   )
 
-val zioVersion                 = "1.0.5"
+val zioVersion                 = "1.0.6"
 val catsVersion                = "2.5.0"
 val catsEffectVersion          = "3.0.2"
 val catsMtlVersion             = "1.1.3"
@@ -56,11 +56,11 @@ lazy val interopCats = crossProject(JSPlatform, JVMPlatform)
   .settings(
     libraryDependencies += "dev.zio" %%% "zio" % zioVersion,
     libraryDependencies ++= Seq(
-      "dev.zio"       %%% "zio-streams"        % zioVersion,
-      "dev.zio"       %%% "zio-test"           % zioVersion,
-      "org.typelevel" %%% "cats-effect-kernel" % catsEffectVersion,
-      "org.typelevel" %%% "cats-mtl"           % catsMtlVersion,
-      "co.fs2"        %%% "fs2-core"           % fs2Version
+      "dev.zio"       %%% "zio-streams"     % zioVersion,
+      "dev.zio"       %%% "zio-test"        % zioVersion,
+      "org.typelevel" %%% "cats-effect-std" % catsEffectVersion,
+      "org.typelevel" %%% "cats-mtl"        % catsMtlVersion,
+      "co.fs2"        %%% "fs2-core"        % fs2Version
     ).map { module =>
       if (isDotty.value) module else module % Optional
     },
@@ -84,7 +84,7 @@ lazy val coreOnlyTest = crossProject(JSPlatform, JVMPlatform)
   .in(file("core-only-test"))
   .dependsOn(interopCats)
   .settings(stdSettings("core-only-test"))
-  .settings(skip in publish := true)
+  .settings(publish / skip := true)
   .settings(
     libraryDependencies ++= Seq(
       "org.typelevel" %%% "cats-core"    % catsVersion,

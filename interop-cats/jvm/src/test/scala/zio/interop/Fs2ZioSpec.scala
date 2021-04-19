@@ -1,8 +1,7 @@
 package zio
 package interop
 
-import cats.effect.Sync
-import cats.effect.kernel.Async
+import cats.effect.kernel.{ Async, Sync }
 import fs2.Stream
 import zio.interop.catz._
 import zio.test.Assertion.equalTo
@@ -45,7 +44,7 @@ object Fs2ZioSpec extends CatsRunnableSpec {
       _ <- Stream
             .bracket(started.succeed(()).unit)(_ => released.succeed(()).unit)
             .evalMap[Task, Unit](_ => fail.await *> IO.fail(new Exception()))
-            .compile
+            .compile[Task, Task, Unit]
             .drain
             .fork
       _ <- started.await
@@ -61,7 +60,7 @@ object Fs2ZioSpec extends CatsRunnableSpec {
       _ <- Stream
             .bracket(started.succeed(()).unit)(_ => released.succeed(()).unit)
             .evalMap[Task, Unit](_ => terminate.await *> IO.die(new Exception()))
-            .compile
+            .compile[Task, Task, Unit]
             .drain
             .fork
       _ <- started.await
@@ -76,7 +75,7 @@ object Fs2ZioSpec extends CatsRunnableSpec {
       f <- Stream
             .bracket(IO.unit)(_ => released.succeed(()).unit)
             .evalMap[Task, Unit](_ => started.succeed(()) *> IO.never)
-            .compile
+            .compile[Task, Task, Unit]
             .drain
             .fork
       _ <- started.await

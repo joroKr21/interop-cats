@@ -43,7 +43,9 @@ trait CatsZManagedSyntax {
 
 final class CatsIOResourceSyntax[F[_], A](private val resource: Resource[F, A]) extends AnyVal {
   def toManaged(implicit F: MonadCancel[F, _], D: Dispatcher[F]): TaskManaged[A] =
-    new ZIOResourceSyntax(resource.mapK(λ[F ~> Task](fromEffect(_)))).toManagedZIO
+    new ZIOResourceSyntax(resource.mapK(new (F ~> Task) {
+      override def apply[B](fb: F[B]) = fromEffect(fb)
+    })).toManagedZIO
 }
 
 final class ZIOResourceSyntax[R, E <: Throwable, A](private val resource: Resource[ZIO[R, E, *], A]) extends AnyVal {
@@ -97,7 +99,9 @@ final class ZManagedSyntax[R, E, A](private val managed: ZManaged[R, E, A]) exte
   }
 
   def toResource[F[_]: Async](implicit R: Runtime[R], ev: E <:< Throwable): Resource[F, A] =
-    toResourceZIO.mapK(λ[ZIO[R, E, *] ~> F](zio => toEffect(zio.mapError(ev))))
+    toResourceZIO.mapK(new (ZIO[R, E, *] ~> F) {
+      override def apply[B](zio: ZIO[R, E, B]) = toEffect(zio.mapError(ev))
+    })
 }
 
 trait CatsEffectZManagedInstances {
@@ -124,7 +128,7 @@ trait CatsZManagedInstances extends CatsZManagedInstances1 {
     new ZManagedMonoidK
 
   implicit final def arrowChoiceRManagedInstances: ArrowChoice[RManaged] =
-    arrowChoiceZManagedInstance0.asInstanceOf[ArrowChoice[RManaged]]
+    arrowChoiceZManagedInstance0
 
   implicit final def parallelZManagedInstances[R, E]: Parallel.Aux[ZManaged[R, E, *], ParallelF[ZManaged[R, E, *], *]] =
     parallelInstance0.asInstanceOf[Parallel.Aux[ZManaged[R, E, *], ParallelF[ZManaged[R, E, *], *]]]
@@ -135,7 +139,7 @@ trait CatsZManagedInstances extends CatsZManagedInstances1 {
   private[this] val contravariantInstance0: Contravariant[RManaged[*, Any]] =
     new ZManagedContravariant
 
-  private[this] val parallelInstance0: Parallel.Aux[TaskManaged, ParallelF[TaskManaged, *]] =
+  private[this] lazy val parallelInstance0: Parallel.Aux[TaskManaged, ParallelF[TaskManaged, *]] =
     new ZManagedParallel
 }
 
@@ -197,7 +201,7 @@ private class ZManagedMonadError[R, E] extends MonadError[ZManaged[R, E, *], E] 
     fa.as(b)
 
   override final def whenA[A](cond: Boolean)(f: => F[A]): F[Unit] =
-    ZManaged.suspend(f).when(cond)
+    ZManaged.when(cond)(f)
 
   override final def unit: F[Unit] =
     ZManaged.unit
